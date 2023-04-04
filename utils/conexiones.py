@@ -3,9 +3,7 @@ import configparser
 from sqlalchemy.engine import URL
 from sqlalchemy.engine import create_engine
 
-def get_db_connection(host: str):
-    config = configparser.ConfigParser()
-    config.read('../escec.cfg')
+def get_db_connection(host: str, config: configparser.ConfigParser):
     
     connection_url = URL.create(
         "mysql+mysqldb",
@@ -17,9 +15,7 @@ def get_db_connection(host: str):
     
     return create_engine(connection_url)
 
-def get_s3_client():
-    config = configparser.ConfigParser()
-    config.read('../escec.cfg')
+def get_s3_client(config: configparser.ConfigParser):
     
     s3_client = boto3.client(
        "s3",

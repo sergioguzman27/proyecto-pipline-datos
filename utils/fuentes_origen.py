@@ -1,18 +1,15 @@
+import io
 import boto3
-import random
-import datetime
 import numpy as np
 import pandas as pd
 import configparser
-from faker import Faker
-from .conexiones import get_db_connection
+from .conexiones import get_db_connection, get_s3_client
 from querys import crear_db
 
 class FuentesOrigen():
     
-    def __init__(self) -> None:
-        self.config = configparser.ConfigParser()
-        self.config.read('../escec.cfg')
+    def __init__(self, config: configparser.ConfigParser) -> None:
+        self.config = config
         
         self.aws_conn = boto3.client(
             'rds',
@@ -61,71 +58,87 @@ class FuentesOrigen():
             return None
         
     def crear_base_relacional(self, host: str):
-        self.engine = get_db_connection(host)
+        self.engine = get_db_connection(host, self.config)
         result = self.engine.execute(crear_db.DLL_QUERY)
         print('result ', result)
         
     def cargar_dataset(self, path: str):
         self.dataset = pd.read_csv(path)
         
-    def cargar_datos_db_relacional(self):
-        # Cargamos primero la tabla Usuarios
-        usuarios_df = self.dataset[['user_id', 'user_name']]
-        usuarios_df.columns = ['IdUser', 'Username']
-        usuarios_df.drop_duplicates(inplace=True)
-        print('usuarios_df\n', usuarios_df)
+    def cargar_datos_fuentes(self):
+        # Cargamos Regiones a la BD
+        regiones_df = self.dataset[['Region']]
+        regiones_df.columns = ['region']
+        regiones_df.drop_duplicates(inplace=True)
+        regiones_df.reset_index(drop=True, inplace=True)
+        regiones_df['idRegion'] = regiones_df.index + 1
+        self.insertar_datos_db(regiones_df, 'Region')
         
-        # Cargamos la tabla Productos
-        productos_df = self.dataset[['product_id', 'product_name', 'about_product',
-                                     'actual_price', 'discounted_price', 'img_link', 'product_link', 'category']]
-        productos_df.columns = ['IdProduct', 'Name', 'Description', 'Price', 'DiscountPercentage',
-                               'ImageLink', 'ProductoLink', 'category']
-        productos_df['Price'] = productos_df['Price'].str.replace("₹",'')
-        productos_df['Price'] = productos_df['Price'].str.replace(",",'')
-        productos_df['Price'] = productos_df['Price'].astype('float64')
+        # Cargamos Ciudades a la BD
+        ciudades_df = self.dataset[['City', 'State', 'Region']]
+        ciudades_df.columns = ['city', 'state', 'region']
+        ciudades_df.drop_duplicates(inplace=True)
+        ciudades_df.reset_index(drop=True, inplace=True)
+        ciudades_df['idCity'] = ciudades_df.index + 1
+        ciudades_df = ciudades_df.merge(regiones_df, how='left', left_on='region', right_on='region')
+        self.insertar_datos_db(ciudades_df.drop(['region'], axis=1), 'City')
         
-        productos_df['DiscountPercentage'] = productos_df['DiscountPercentage'].str.replace('%','')
-        productos_df['DiscountPercentage'] = productos_df['DiscountPercentage'].astype('float64')
+        # Cargamos Clientes a la BD
+        clientes_df = self.dataset[['Customer Name', 'City', 'Region']]
+        clientes_df.columns = ['name', 'city', 'region']
+        clientes_df.drop_duplicates(inplace=True)
+        clientes_df.reset_index(drop=True, inplace=True)
+        clientes_df['idCustomer'] = clientes_df.index + 1
+        clientes_df = clientes_df.merge(ciudades_df, how='left', left_on=['city', 'region'], right_on=['city', 'region'])
+        self.insertar_datos_db(clientes_df.drop(['city', 'state', 'idRegion', 'region'], axis=1), 'Customer')
+        # print('clientes_df\n', clientes_df)
         
-        productos_df['category'] = productos_df.apply(lambda x: self._get_categoria(x), axis=1)
-        categorias_df = self.get_categorias_df()
-        productos_df = productos_df.merge(
-            categorias_df, how='inner', left_on='category', right_on='Name_Cat', suffixes=('', '_Cat')
-        )
-        productos_df['CategoryId'] = productos_df['CategoryId_Cat']
+        # Cargamos categorias a un S3
+        categorias_df = self.dataset[['Category']]
+        categorias_df.drop_duplicates(inplace=True)
+        categorias_df.reset_index(drop=True, inplace=True)
+        categorias_df['Category Id'] = categorias_df.index + 1
+        self.guardar_s3(categorias_df, 'maestros/categorias.csv')
+        
+        # Cargamos subcategorias a un S3
+        sub_categorias_df = self.dataset[['Category', 'Sub Category']]
+        sub_categorias_df.drop_duplicates(inplace=True)
+        sub_categorias_df.reset_index(drop=True, inplace=True)
+        sub_categorias_df['Sub Category Id'] = sub_categorias_df.index + 1
+        sub_categorias_df = sub_categorias_df.merge(categorias_df, how='left', left_on='Category', right_on='Category')
+        self.guardar_s3(sub_categorias_df.drop(['Category'], axis=1), 'maestros/sub_categorias.csv')
+        
+        # Cargamos Ordenes a la BD
+        ordenes_df = self.dataset.copy()
+        ordenes_df.drop_duplicates(inplace=True)
+        print('ordenes_df1\n', ordenes_df)
+        ordenes_df.reset_index(drop=True, inplace=True)
+        ordenes_df['idOrder'] = ordenes_df.index + 1
+        ordenes_df = ordenes_df.merge(clientes_df, how='left', left_on=['Customer Name', 'City', 'Region'], right_on=['name', 'city', 'region'])
+        # print('ordenes_df2\n', ordenes_df)
+        ordenes_df = ordenes_df.merge(sub_categorias_df, how='left', left_on=['Sub Category', 'Category'], right_on=['Sub Category', 'Category'])
+        ordenes_df = ordenes_df[['idOrder', 'Order ID', 'Sales', 'Discount', 'Profit', 'Order Date', 'idCustomer', 'Sub Category Id']]
+        ordenes_df.columns = ['idOrder', 'orderNumber', 'sales', 'discount', 'profit', 'date', 'idCustomer', 'sub_category_id']
+        print('ordenes_df3\n', ordenes_df)
+        self.insertar_datos_db(ordenes_df, 'Order')
+        
+    def guardar_s3(self, df: pd.DataFrame, key: str):
+        self.s3_client = get_s3_client(self.config)
+        bucket = self.config.get('S3', 'BUCKET')
+        
+        with io.StringIO() as csv_buffer:
+            df.to_csv(csv_buffer, index=False)
 
-        productos_df.drop_duplicates(inplace=True).drop(['category', 'CategoryId_Cat', 'Name_Cat'], inplace=True)
-        print('productos_df\n', productos_df)
-        
-        # Cargamos la tabla Reseñas
-        review_df = self.dataset[['review_id', 'review_title', 'review_content', 'discounted_price',
-                                  'rating', 'user_id']]
-        
-        
-        
-        
-    def _get_categoria(self, row):
-        categorias = row['category'].split('|')
-        return categorias[1] if len(categorias) > 1 else categorias[0]
-    
-    def get_categorias_df(self):
-        categorias_df = self.dataset[['category']]
-        categorias_df['category'] = categorias_df.apply(lambda x: self._get_categoria(x), axis=1)
-        categorias_unicas = categorias_df['category'].unique().tolist()
-        categorias_df = pd.DataFrame({'Name': categorias_unicas})
-        categorias_df['CategoryId'] = categorias_df.index + 1
-        
-        return categorias_df
-    
-    def cargar_datos_maestros_s3(self):
-        # Cargamos el maestro de categorias
-        categorias_df = self.get_categorias_df()
-        print('categorias_df\n', categorias_df)
-        
-        # Cargamos el maestro de Tipos de Review con datos de prueba
-        tipos_review_df = pd.DataFrame({
-            'Type': ['Reseña comparativa', 'Reseña de experto', 'Reseña de usuario', 'Reseña por uso']
-        })
-        tipos_review_df['ReviewTypeId'] = tipos_review_df.index + 1
-        print('tipos_review_df\n', tipos_review_df)
-        
+            response = self.s3_client.put_object(
+                Bucket=bucket, Key=key, Body=csv_buffer.getvalue()
+            )
+
+            status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+
+            if status == 200:
+                print(f"Successful S3 put_object response. Status - {status}")
+            else:
+                print(f"Unsuccessful S3 put_object response. Status - {status}")
+                
+    def insertar_datos_db(self, df: pd.DataFrame, tabla: str):
+        df.to_sql(tabla, con=self.engine, if_exists='append', chunksize=500, index=False)
