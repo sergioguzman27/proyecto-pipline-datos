@@ -112,10 +112,23 @@ class ETL():
         fact_table_df = fact_table_df.merge(self.clientes_dim_df, how='inner', left_on='idCustomer', right_on='idCustomer')
         fact_table_df.drop(['name', 'city', 'state', 'region'], axis=1, inplace=True)
         
+        # Generamos la nueva llave
+        fact_table_df['idOrderFact'] = fact_table_df['idOrder']
+        
         # Formamos la llave de la dimension de fecha
         fact_table_df['idDate'] = fact_table_df.apply(lambda x: int(x['date'].strftime('%Y%m%d')), axis=1)
-        fact_table_df.drop(['date'], axis=1, inplace=True)
+        
+        fact_table_df.drop(['date', 'idOrder'], axis=1, inplace=True)
         print('fact_table_df\n', fact_table_df)
         self.fact_table_df = fact_table_df
+        
+    def insertar_dw(self):
+        # Primero insertamos las dimensiones
+        self.categoria_dim_df.to_sql('CategoryDim', con=self.engine, if_exists='append', chunksize=500, index=False)
+        self.clientes_dim_df.to_sql('CustomerDim', con=self.engine, if_exists='append', chunksize=500, index=False)
+        self.fechas_dim_df.to_sql('DateDim', con=self.engine, if_exists='append', chunksize=500, index=False)
+        
+        # Insertamos la fact table
+        self.fact_table_df.to_sql('OrderFact', con=self.engine, if_exists='append', chunksize=500, index=False)
         
         
