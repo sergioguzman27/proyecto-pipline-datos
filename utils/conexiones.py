@@ -3,14 +3,14 @@ import configparser
 from sqlalchemy.engine import URL
 from sqlalchemy.engine import create_engine
 
-def get_db_connection(host: str, config: configparser.ConfigParser):
+def get_db_connection(host: str, section: str, config: configparser.ConfigParser):
     
     connection_url = URL.create(
         "mysql+mysqldb",
-        username=config.get('RDS', 'DB_USER'),
-        password=config.get('RDS', 'DB_PASSWORD'),
+        username=config.get(section, 'DB_USER'),
+        password=config.get(section, 'DB_PASSWORD'),
         host=host,
-        database=config.get('RDS', 'DB_NAME')
+        database=config.get(section, 'DB_NAME')
     )
     
     return create_engine(connection_url)

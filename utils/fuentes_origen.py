@@ -58,7 +58,7 @@ class FuentesOrigen():
             return None
         
     def crear_base_relacional(self, host: str):
-        self.engine = get_db_connection(host, self.config)
+        self.engine = get_db_connection(host, 'RDS', self.config)
         result = self.engine.execute(crear_db.DLL_QUERY)
         print('result ', result)
         
@@ -111,15 +111,15 @@ class FuentesOrigen():
         # Cargamos Ordenes a la BD
         ordenes_df = self.dataset.copy()
         ordenes_df.drop_duplicates(inplace=True)
-        print('ordenes_df1\n', ordenes_df)
         ordenes_df.reset_index(drop=True, inplace=True)
         ordenes_df['idOrder'] = ordenes_df.index + 1
         ordenes_df = ordenes_df.merge(clientes_df, how='left', left_on=['Customer Name', 'City', 'Region'], right_on=['name', 'city', 'region'])
-        # print('ordenes_df2\n', ordenes_df)
         ordenes_df = ordenes_df.merge(sub_categorias_df, how='left', left_on=['Sub Category', 'Category'], right_on=['Sub Category', 'Category'])
         ordenes_df = ordenes_df[['idOrder', 'Order ID', 'Sales', 'Discount', 'Profit', 'Order Date', 'idCustomer', 'Sub Category Id']]
         ordenes_df.columns = ['idOrder', 'orderNumber', 'sales', 'discount', 'profit', 'date', 'idCustomer', 'sub_category_id']
-        print('ordenes_df3\n', ordenes_df)
+        # print('ordenes_df3\n', ordenes_df)
+        ordenes_df['date'] = pd.to_datetime(ordenes_df['date'])
+        print('ordenes_df4\n', ordenes_df)
         self.insertar_datos_db(ordenes_df, 'Order')
         
     def guardar_s3(self, df: pd.DataFrame, key: str):
