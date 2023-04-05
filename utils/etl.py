@@ -99,4 +99,23 @@ class ETL():
         print('fechas_dim_df\n', fechas_dim_df)
         self.fechas_dim_df = fechas_dim_df
         
+    def crear_fact_table(self):
+        # Leemos la tabla de ordenes
+        ordenes_df = pd.read_sql_query('SELECT * FROM `Order`', con=self.engine_db)
+        ordenes_df['date'] = pd.to_datetime(ordenes_df['date'])
+        
+        # Unimos la dimension de categorias
+        fact_table_df = ordenes_df.merge(self.categoria_dim_df, how='inner', left_on='sub_category_id', right_on='idSubCategory')
+        fact_table_df.drop(['sub_category_id', 'subCategory', 'category'], axis=1, inplace=True)
+        
+        # Unimos la dimension de clientes
+        fact_table_df = fact_table_df.merge(self.clientes_dim_df, how='inner', left_on='idCustomer', right_on='idCustomer')
+        fact_table_df.drop(['name', 'city', 'state', 'region'], axis=1, inplace=True)
+        
+        # Formamos la llave de la dimension de fecha
+        fact_table_df['idDate'] = fact_table_df.apply(lambda x: int(x['date'].strftime('%Y%m%d')), axis=1)
+        fact_table_df.drop(['date'], axis=1, inplace=True)
+        print('fact_table_df\n', fact_table_df)
+        self.fact_table_df = fact_table_df
+        
         

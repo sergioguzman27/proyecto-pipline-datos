@@ -69,29 +69,29 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `grocery_dw`.`OrderFact` (
   `idOrderFact` INT NOT NULL,
-  `DateDim_idDate` INT NOT NULL,
-  `CustomerDim_idCustomer` INT NOT NULL,
-  `CategoryDim_idSubCategory` INT NOT NULL,
+  `idDate` INT NOT NULL,
+  `idCustomer` INT NOT NULL,
+  `idSubCategory` INT NOT NULL,
   `orderNumber` VARCHAR(45) NULL,
   `sales` FLOAT NULL,
   `discount` FLOAT NULL,
   `profit` FLOAT NULL,
-  PRIMARY KEY (`idOrderFact`, `DateDim_idDate`, `CustomerDim_idCustomer`, `CategoryDim_idSubCategory`),
-  INDEX `fk_OrderFact_DateDim_idx` (`DateDim_idDate` ASC) VISIBLE,
-  INDEX `fk_OrderFact_CustomerDim1_idx` (`CustomerDim_idCustomer` ASC) VISIBLE,
-  INDEX `fk_OrderFact_CategoryDim1_idx` (`CategoryDim_idSubCategory` ASC) VISIBLE,
+  PRIMARY KEY (`idOrderFact`, `idDate`, `idCustomer`, `idSubCategory`),
+  INDEX `fk_OrderFact_DateDim_idx` (`idDate` ASC) VISIBLE,
+  INDEX `fk_OrderFact_CustomerDim1_idx` (`idCustomer` ASC) VISIBLE,
+  INDEX `fk_OrderFact_CategoryDim1_idx` (`idSubCategory` ASC) VISIBLE,
   CONSTRAINT `fk_OrderFact_DateDim`
-    FOREIGN KEY (`DateDim_idDate`)
+    FOREIGN KEY (`idDate`)
     REFERENCES `grocery_dw`.`DateDim` (`idDate`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_OrderFact_CustomerDim1`
-    FOREIGN KEY (`CustomerDim_idCustomer`)
+    FOREIGN KEY (`idCustomer`)
     REFERENCES `grocery_dw`.`CustomerDim` (`idCustomer`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_OrderFact_CategoryDim1`
-    FOREIGN KEY (`CategoryDim_idSubCategory`)
+    FOREIGN KEY (`idSubCategory`)
     REFERENCES `grocery_dw`.`CategoryDim` (`idSubCategory`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
