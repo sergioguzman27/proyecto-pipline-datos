@@ -1,0 +1,5 @@
+boto3==1.26.90
+botocore==1.29.90
+mysqlclient==2.1.1
+psycopg2==2.9.5
+SQLAlchemy==1.4.16
