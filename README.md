@@ -42,7 +42,7 @@ pip install --r requirements.txt
 A continuación se listan los elementos mas importantes del proyecto y el propósito que tienen.
 
 | Elemento | Tipo | Descripción | 
-| ------ | ------ |
+| ------ | ------ | ------ |
 | `diagramas` | Carpeta | Contiene los diagramas relacionales de la base de datos y del datawarehouse |
 | `querys` | Carpeta | Contiene las sentencias DLL para crear tanto la base de datos relacional como el DW |
 | `reporteria` | Carpeta | Contiene las imagenes y archivo de Tablau que se usaron para el análisis |
